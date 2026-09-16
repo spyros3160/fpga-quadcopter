@@ -163,9 +163,22 @@ Typical values used during simulation:
 
 The PWM module uses generic parameters for the clock frequency and PWM period, allowing the same RTL module to be reused with different FPGA clock frequencies.
 
+### 4-Channel PWM
+
+A four-channel PWM controller was developed using structural VHDL.
+
+The existing `pwm` module is instantiated four times to generate four independent PWM outputs:
+
+- PWM Channel 1
+- PWM Channel 2
+- PWM Channel 3
+- PWM Channel 4
+
+The four channels are intended to provide independent control signals for the four ESCs of the quadcopter..
+
 ## PWM Verification
 
-The PWM generator was verified using ModelSim.
+The PWM generator was first verified using ModelSim.
 
 The simulation confirmed:
 
@@ -174,6 +187,21 @@ The simulation confirmed:
 - 2000 μs pulse width
 - 20 ms PWM period
 - 50 Hz PWM frequency
+
+The 4-channel PWM controller was then verified using a dedicated ModelSim testbench.
+
+The simulation confirmed four independent PWM outputs with different pulse widths.
+
+The 4-channel design was also compiled using Quartus Prime and programmed onto the DSD-i1 development board.
+
+Hardware testing confirmed the operation of all four PWM outputs.
+
+The PWM outputs were assigned to the following DSD-i1 FPGA pins:
+
+- `PWM1 → PIN_110`
+- `PWM2 → PIN_111`
+- `PWM3 → PIN_112`
+- `PWM4 → PIN_113`
 
 The 1500 μs pulse width and 20 ms period were measured using ModelSim waveform cursors.
 
@@ -184,8 +212,14 @@ The current hardware test uses the following DSD-i1 FPGA pins:
 | Signal | FPGA Pin | Function |
 |--------|----------|----------|
 | `clk`  | `PIN_23` | 50 MHz onboard clock |
-| `led`  | `PIN_110` | LED output |
+| `pwm_out_1` | `PIN_110` | PWM Channel 1 |
+| `pwm_out_2` | `PIN_111` | PWM Channel 2 |
+| `pwm_out_3` | `PIN_112` | PWM Channel 3 |
+| `pwm_out_4` | `PIN_113` | PWM Channel 4 |
 
+I/O standard:
+
+- 3.3-V LVCMOS
 I/O standard:
 
 - 3.3-V LVCMOS
@@ -193,6 +227,7 @@ I/O standard:
 ## Technologies
 
 - VHDL
+- Structural VHDL
 - Intel/Altera FPGA
 - Cyclone IV E
 - MAX 10
@@ -204,6 +239,7 @@ I/O standard:
 - UART
 - PID Control
 - FPGA-based Control Systems
+- Hardware Verification
 
 ## Safety
 
