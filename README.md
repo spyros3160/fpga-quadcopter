@@ -222,6 +222,31 @@ I/O standard:
 - 3.3-V LVCMOS
 I/O standard:
 
+
+## SPI Master
+
+Implemented an 8-bit SPI Master in VHDL.
+
+### Features
+
+- SPI Mode 0
+- 1 MHz SPI clock
+- MSB-first transmission
+- 8-bit transmit and receive
+- Start/done control
+- CS, SCLK, MOSI and MISO signals
+
+### Verification
+
+The SPI Master was simulated in ModelSim using a virtual SPI slave.
+
+Verified:
+- MOSI transmission
+- MISO reception
+- 8-bit transfers
+- CS control
+- SPI clock generation
+- Transfer completion
 - 3.3-V LVCMOS
 
 ## Technologies
