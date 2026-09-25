@@ -81,19 +81,19 @@ The final flight controller is planned to contain the following hardware modules
 - [x] LED output
 - [x] FPGA pin assignments
 - [x] Successful Quartus compilation
-- [ ] Hardware programming and LED test
+- [x] Hardware programming and LED test
 - [x] PWM generator
 - [x] PWM simulation and verification
 
 ### Phase 2 — Motor Control
 
-- [ ] Four independent PWM outputs
+- [x] Four independent PWM outputs
 - [ ] ESC interface
 - [ ] Bench testing with propellers removed
 
 ### Phase 3 — IMU Interface
 
-- [ ] SPI master
+- [x] SPI master
 - [ ] IMU communication
 - [ ] Accelerometer data processing
 - [ ] Gyroscope data processing
@@ -117,7 +117,6 @@ The final flight controller is planned to contain the following hardware modules
 
 ## Repository Structure
 
-```text
 fpga-quadcopter/
 │
 ├── README.md
@@ -125,20 +124,21 @@ fpga-quadcopter/
 │
 ├── rtl/
 │   ├── fpga_quadcopter.vhd
-│   └── pwm.vhd
+│   ├── fpga_quadcopter_pwm.vhd
+│   ├── pwm.vhd
+│   ├── pwm_4ch.vhd
+│   └── spi_master.vhd
 │
 ├── simulation/
-│   └── pwm_tb.vhd
+│   ├── pwm_tb.vhd
+│   ├── pwm_4ch_tb.vhd
+│   └── spi_master_tb.vhd
 │
 ├── constraints/
 ├── docs/
 ├── hardware/
 └── images/
 
-
-### 2️⃣ Current FPGA Design → PWM Verification
-
-```markdown
 ## Current FPGA Design
 
 The current VHDL design implements a simple clock divider/counter.
@@ -247,7 +247,6 @@ Verified:
 - CS control
 - SPI clock generation
 - Transfer completion
-- 3.3-V LVCMOS
 
 ## Technologies
 
