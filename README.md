@@ -127,13 +127,15 @@ fpga-quadcopter/
 │   ├── fpga_quadcopter_pwm.vhd
 │   ├── pwm.vhd
 │   ├── pwm_4ch.vhd
-│   └── spi_master.vhd
+│   ├── spi_master.vhd
+│   └── imu_controller.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
 │   ├── pwm_4ch_tb.vhd
-│   └── spi_master_tb.vhd
-│
+│   ├── spi_master_tb.vhd
+│   └── imu_controller_tb.vhd
+|
 ├── constraints/
 ├── docs/
 ├── hardware/
@@ -223,6 +225,7 @@ I/O standard:
 I/O standard:
 
 
+
 ## SPI Master
 
 Implemented an 8-bit SPI Master in VHDL.
@@ -235,6 +238,14 @@ Implemented an 8-bit SPI Master in VHDL.
 - 8-bit transmit and receive
 - Start/done control
 - CS, SCLK, MOSI and MISO signals
+
+## IMU Controller
+
+An IMU controller was implemented in VHDL to interface with the SPI Master.
+
+The controller manages SPI transactions and provides received data to the higher-level flight-control logic.
+
+The IMU Controller was verified in ModelSim using a virtual SPI device.
 
 ### Verification
 
