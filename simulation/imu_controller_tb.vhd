@@ -7,25 +7,48 @@ end entity imu_controller_tb;
 
 architecture sim of imu_controller_tb is
 
+    ----------------------------------------------------------------
     -- FPGA clock
+    ----------------------------------------------------------------
+
     signal clk : std_logic := '0';
 
-    -- Controller interface
-    signal start   : std_logic := '0';
-    signal tx_data : std_logic_vector(7 downto 0) := (others => '0');
 
-    signal rx_data : std_logic_vector(7 downto 0);
-    signal done    : std_logic;
+    ----------------------------------------------------------------
+    -- IMU Controller interface
+    ----------------------------------------------------------------
 
+    signal start            : std_logic := '0';
+    signal register_address : std_logic_vector(7 downto 0) := (others => '0');
+
+    signal register_data    : std_logic_vector(7 downto 0);
+    signal done             : std_logic;
+
+
+    ----------------------------------------------------------------
     -- SPI signals
+    ----------------------------------------------------------------
+
     signal sclk : std_logic;
     signal mosi : std_logic;
     signal miso : std_logic := '0';
     signal cs   : std_logic;
 
-    -- Virtual IMU data
-    signal imu_data : std_logic_vector(7 downto 0) := "00110101";
-    signal imu_bit  : integer range 0 to 7 := 0;
+
+    ----------------------------------------------------------------
+    -- Virtual IMU
+    ----------------------------------------------------------------
+
+    -- Virtual register data
+    constant IMU_REGISTER_DATA : std_logic_vector(7 downto 0)
+        := "01000010";   -- 0x42
+
+    -- Address received from FPGA
+    signal address_received : std_logic_vector(7 downto 0)
+        := (others => '0');
+
+    signal imu_bit : integer range 0 to 7 := 0;
+
 
 begin
 
@@ -43,18 +66,18 @@ begin
     DUT : entity work.imu_controller
 
         port map (
-            clk      => clk,
+            clk              => clk,
 
-            start    => start,
-            tx_data  => tx_data,
+            start            => start,
+            register_address => register_address,
 
-            rx_data  => rx_data,
-            done     => done,
+            register_data    => register_data,
+            done             => done,
 
-            sclk     => sclk,
-            mosi     => mosi,
-            miso     => miso,
-            cs       => cs
+            sclk             => sclk,
+            mosi             => mosi,
+            miso             => miso,
+            cs               => cs
         );
 
 
@@ -65,31 +88,64 @@ begin
     process
     begin
 
-        -- Data transmitted by FPGA
-        tx_data <= "11001010";
+        ------------------------------------------------------------
+        -- Request register 0x75
+        ------------------------------------------------------------
 
-        -- Wait before starting
+        register_address <= x"75";
+
         wait for 100 ns;
 
-        -- Start transaction
+
+        ------------------------------------------------------------
+        -- Start register read
+        ------------------------------------------------------------
+
         start <= '1';
 
         wait for 20 ns;
 
         start <= '0';
 
-        -- Wait until transaction is completed
+
+        ------------------------------------------------------------
+        -- Wait for transaction completion
+        ------------------------------------------------------------
+
         wait until done = '1';
 
-        -- Check received data
-        assert rx_data = "00110101"
-            report "ERROR: Received data is incorrect!"
+
+        ------------------------------------------------------------
+        -- Check received register data
+        ------------------------------------------------------------
+
+        assert register_data = IMU_REGISTER_DATA
+
+            report "ERROR: Register data is incorrect!"
+
             severity error;
 
-        report "SUCCESS: IMU Controller received correct data."
+
+        ------------------------------------------------------------
+        -- Check transmitted register address
+        ------------------------------------------------------------
+
+        assert address_received = x"75"
+
+            report "ERROR: Register address is incorrect!"
+
+            severity error;
+
+
+        ------------------------------------------------------------
+        -- Successful test
+        ------------------------------------------------------------
+
+        report "SUCCESS: IMU Controller register read completed correctly."
+
             severity note;
 
-        -- Give ModelSim some time to display final signals
+
         wait for 100 ns;
 
         wait;
@@ -99,24 +155,47 @@ begin
 
     ----------------------------------------------------------------
     -- Virtual IMU
+    --
     -- SPI Mode 0
     ----------------------------------------------------------------
 
     process(cs, sclk)
     begin
 
-        -- CS goes LOW:
+        ------------------------------------------------------------
+        -- CS LOW
         -- Start of SPI transaction
+        ------------------------------------------------------------
+
         if falling_edge(cs) then
 
             imu_bit <= 0;
 
-            -- First bit (MSB)
-            miso <= imu_data(7);
+            -- Send MSB of register data
+            miso <= IMU_REGISTER_DATA(7);
 
 
-        -- SCLK falling edge:
+        ------------------------------------------------------------
+        -- Rising edge of SCLK
+        -- FPGA samples MISO
+        -- Virtual IMU samples MOSI
+        ------------------------------------------------------------
+
+        elsif rising_edge(sclk) then
+
+            if cs = '0' then
+
+                address_received <=
+                    address_received(6 downto 0) & mosi;
+
+            end if;
+
+
+        ------------------------------------------------------------
+        -- Falling edge of SCLK
         -- Prepare next MISO bit
+        ------------------------------------------------------------
+
         elsif falling_edge(sclk) then
 
             if cs = '0' then
@@ -125,7 +204,7 @@ begin
 
                     imu_bit <= imu_bit + 1;
 
-                    miso <= imu_data(6 - imu_bit);
+                    miso <= IMU_REGISTER_DATA(6 - imu_bit);
 
                 end if;
 
