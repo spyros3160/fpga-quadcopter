@@ -105,6 +105,7 @@ begin
 							  last_bit <= '0';
 							  sclk_int <= '0';
 							  mosi <= '0';
+							  done <= '1';
 
 						else
 
