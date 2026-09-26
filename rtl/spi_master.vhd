@@ -1,138 +1,166 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
-entity spi_master is
-
-    generic (
-        CLK_FREQ_HZ : integer := 50000000;
-        SPI_FREQ_HZ : integer := 1000000
-    );
+entity imu_controller is
 
     port (
         clk : in std_logic;
 
-        start   : in  std_logic;
-        tx_data : in  std_logic_vector(7 downto 0);
+        -- IMU register interface
+        start            : in  std_logic;
+        register_address : in  std_logic_vector(7 downto 0);
 
-        rx_data : out std_logic_vector(7 downto 0);
-        done    : out std_logic;
+        register_data    : out std_logic_vector(7 downto 0);
+        done             : out std_logic;
 
+        -- SPI interface
         sclk : out std_logic;
         mosi : out std_logic;
-        miso : in  std_logic;
+        miso : in std_logic;
         cs   : out std_logic
     );
 
-end entity spi_master;
+end entity imu_controller;
 
-architecture rtl of spi_master is
-	
-	-- Generate SPI clock
-	-- FPGA clock period = 20 ns
-	-- SPI clock period = 1000 ns
-	-- 25 FPGA clock cycles for each half-period of SPI clock
-	constant CLK_DIV : integer := CLK_FREQ_HZ / (2 * SPI_FREQ_HZ);
 
-	 --clock counter from 0 to 24
-    signal clk_count : integer range 0 to CLK_DIV - 1 := 0;
-	 
-	 --counter for internal clock of SPI master 
-	 signal sclk_int : std_logic := '0';
-	 
-	 -- Transmit shift register
-    signal tx_shift : std_logic_vector(7 downto 0) := (others => '0');
+architecture rtl of imu_controller is
 
-    -- Receive shift register
-    signal rx_shift : std_logic_vector(7 downto 0) := (others => '0');
-	 
-	 --commmunication SPI->IMU
-	 signal busy : std_logic := '0';
-	 
-	 --BIT counter
-	 signal bit_count : integer range 0 to 7 := 0;
-	 
-	 -- Indicates that the last SPI bit has been received
-	 signal last_bit : std_logic := '0';
+    ---------------------------------------------------------------
+    -- SPI Master interface
+    ---------------------------------------------------------------
+
+    signal spi_start   : std_logic := '0';
+
+    signal spi_tx_data : std_logic_vector(15 downto 0)
+        := (others => '0');
+
+    signal spi_rx_data : std_logic_vector(15 downto 0);
+
+    signal spi_done : std_logic;
+
+
+    ---------------------------------------------------------------
+    -- Controller state
+    ---------------------------------------------------------------
+
+    type state_type is (
+        IDLE,
+        START_SPI,
+        WAIT_SPI
+    );
+
+    signal state : state_type := IDLE;
 
 begin
 
-process(clk)
-begin
+    ---------------------------------------------------------------
+    -- SPI Master
+    ---------------------------------------------------------------
 
-    if rising_edge(clk) then
-		  done <= '0';
+    SPI : entity work.spi_master
 
-        if busy = '0' then
-		  
-				if start = '1' then
-					 busy <= '1';
-					 clk_count <= 0;
-					 sclk_int <= '0';
+        generic map (
+            CLK_FREQ_HZ => 50000000,
+            SPI_FREQ_HZ => 1000000
+        )
 
-					 tx_shift <= tx_data;
-					 mosi <= tx_data(7);
-					 bit_count <= 0;
-				end if;
+        port map (
+            clk      => clk,
 
-        else
+            start    => spi_start,
+            tx_data  => spi_tx_data,
 
-            if clk_count = CLK_DIV - 1 then
+            rx_data  => spi_rx_data,
+            done     => spi_done,
 
-                clk_count <= 0;
+            sclk     => sclk,
+            mosi     => mosi,
+            miso     => miso,
+            cs       => cs
+        );
 
-                if sclk_int = '0' then
 
-                    -- Rising edge: read MISO
-                    rx_shift <= rx_shift(6 downto 0) & miso;
+    ---------------------------------------------------------------
+    -- IMU Controller
+    ---------------------------------------------------------------
 
-                    if bit_count = 7 then
-								-- 8 bits completed
-								rx_data <= rx_shift(6 downto 0) & miso;
-								last_bit <= '1';
-								
-                    else
-                        bit_count <= bit_count + 1;
-								
-								
+    process(clk)
+    begin
+
+        if rising_edge(clk) then
+
+            -- Default values
+            spi_start <= '0';
+            done      <= '0';
+
+            case state is
+
+                ----------------------------------------------------
+                -- Waiting for a register read request
+                ----------------------------------------------------
+
+                when IDLE =>
+
+                    if start = '1' then
+
+                        ------------------------------------------------
+                        -- ICM-42688-P SPI READ
+                        --
+                        -- First byte:
+                        -- bit 7 = 1 -> READ
+                        -- bits 6:0 = register address
+                        --
+                        -- Second byte:
+                        -- dummy byte
+                        ------------------------------------------------
+
+                        spi_tx_data <=
+                            ('1' & register_address(6 downto 0))
+                            & x"00";
+
+                        state <= START_SPI;
+
                     end if;
-						  
-					else
 
-						if last_bit = '1' then
 
-							  -- SPI transfer completed
-							  busy <= '0';
-							  last_bit <= '0';
-							  sclk_int <= '0';
-							  mosi <= '0';
-							  done <= '1';
+                ----------------------------------------------------
+                -- Start SPI transaction
+                ----------------------------------------------------
 
-						else
+                when START_SPI =>
 
-							  tx_shift <= tx_shift(6 downto 0) & '0';
-							  mosi <= tx_shift(6);
-							  sclk_int <= not sclk_int;
+                    spi_start <= '1';
 
-						end if;
+                    state <= WAIT_SPI;
 
-                end if;
 
-                sclk_int <= not sclk_int;
+                ----------------------------------------------------
+                -- Wait for SPI transaction
+                ----------------------------------------------------
 
-            else
-                clk_count <= clk_count + 1;
-					 
-            end if;
+                when WAIT_SPI =>
+
+                    if spi_done = '1' then
+
+                        ------------------------------------------------
+                        -- The second received byte contains
+                        -- the register data
+                        ------------------------------------------------
+
+                        register_data <=
+                            spi_rx_data(7 downto 0);
+
+                        done <= '1';
+
+                        state <= IDLE;
+
+                    end if;
+
+
+            end case;
 
         end if;
 
-    end if;
-
-end process;
-
-
-sclk <= sclk_int;
-cs <= not busy;
-
+    end process;
 
 end architecture rtl;
