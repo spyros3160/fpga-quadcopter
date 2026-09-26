@@ -16,7 +16,7 @@ entity imu_controller is
         -- SPI interface
         sclk : out std_logic;
         mosi : out std_logic;
-        miso : in  std_logic;
+        miso : in std_logic;
         cs   : out std_logic
     );
 
@@ -25,14 +25,24 @@ end entity imu_controller;
 
 architecture rtl of imu_controller is
 
+    ---------------------------------------------------------------
     -- SPI Master interface
+    ---------------------------------------------------------------
+
     signal spi_start   : std_logic := '0';
-    signal spi_tx_data : std_logic_vector(7 downto 0) := (others => '0');
 
-    signal spi_rx_data : std_logic_vector(7 downto 0);
-    signal spi_done    : std_logic;
+    signal spi_tx_data : std_logic_vector(15 downto 0)
+        := (others => '0');
 
+    signal spi_rx_data : std_logic_vector(15 downto 0);
+
+    signal spi_done : std_logic;
+
+
+    ---------------------------------------------------------------
     -- Controller state
+    ---------------------------------------------------------------
+
     type state_type is (
         IDLE,
         START_SPI,
@@ -43,9 +53,9 @@ architecture rtl of imu_controller is
 
 begin
 
-    ----------------------------------------------------------------
+    ---------------------------------------------------------------
     -- SPI Master
-    ----------------------------------------------------------------
+    ---------------------------------------------------------------
 
     SPI : entity work.spi_master
 
@@ -70,9 +80,9 @@ begin
         );
 
 
-    ----------------------------------------------------------------
+    ---------------------------------------------------------------
     -- IMU Controller
-    ----------------------------------------------------------------
+    ---------------------------------------------------------------
 
     process(clk)
     begin
@@ -86,15 +96,27 @@ begin
             case state is
 
                 ----------------------------------------------------
-                -- Waiting for a new register read
+                -- Waiting for a register read request
                 ----------------------------------------------------
 
                 when IDLE =>
 
                     if start = '1' then
 
-                        -- Send register address to SPI Master
-                        spi_tx_data <= register_address;
+                        ------------------------------------------------
+                        -- ICM-42688-P SPI READ
+                        --
+                        -- First byte:
+                        -- bit 7 = 1 -> READ
+                        -- bits 6:0 = register address
+                        --
+                        -- Second byte:
+                        -- dummy byte
+                        ------------------------------------------------
+
+                        spi_tx_data <=
+                            ('1' & register_address(6 downto 0))
+                            & x"00";
 
                         state <= START_SPI;
 
@@ -102,7 +124,7 @@ begin
 
 
                 ----------------------------------------------------
-                -- Start SPI transfer
+                -- Start SPI transaction
                 ----------------------------------------------------
 
                 when START_SPI =>
@@ -113,18 +135,21 @@ begin
 
 
                 ----------------------------------------------------
-                -- Wait for SPI transfer to complete
+                -- Wait for SPI transaction
                 ----------------------------------------------------
 
                 when WAIT_SPI =>
 
                     if spi_done = '1' then
 
-                        -- Store received register data
-                        register_data <= spi_rx_data;
+                        ------------------------------------------------
+                        -- The second received byte contains
+                        -- the register data
+                        ------------------------------------------------
 
-                        -- Inform the higher-level logic
-                        -- that the register read is complete
+                        register_data <=
+                            spi_rx_data(7 downto 0);
+
                         done <= '1';
 
                         state <= IDLE;
