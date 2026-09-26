@@ -19,10 +19,13 @@ architecture sim of imu_controller_tb is
     ----------------------------------------------------------------
 
     signal start            : std_logic := '0';
-    signal register_address : std_logic_vector(7 downto 0) := (others => '0');
 
-    signal register_data    : std_logic_vector(7 downto 0);
-    signal done             : std_logic;
+    signal register_address : std_logic_vector(7 downto 0)
+        := (others => '0');
+
+    signal register_data : std_logic_vector(7 downto 0);
+
+    signal done : std_logic;
 
 
     ----------------------------------------------------------------
@@ -30,24 +33,39 @@ architecture sim of imu_controller_tb is
     ----------------------------------------------------------------
 
     signal sclk : std_logic;
+
     signal mosi : std_logic;
+
     signal miso : std_logic := '0';
-    signal cs   : std_logic;
+
+    signal cs : std_logic;
 
 
     ----------------------------------------------------------------
-    -- Virtual IMU
+    -- Virtual ICM-42688-P
     ----------------------------------------------------------------
 
-    -- Virtual register data
-    constant IMU_REGISTER_DATA : std_logic_vector(7 downto 0)
-        := "01000010";   -- 0x42
+    -- WHO_AM_I register value
+    constant WHO_AM_I_DATA : std_logic_vector(7 downto 0)
+        := x"47";
+
+    -- The complete 16-bit response from the IMU
+    --
+    -- First byte  = dummy
+    -- Second byte = WHO_AM_I = 0x47
+    constant IMU_RESPONSE : std_logic_vector(15 downto 0)
+        := x"0047";
+
+    -- Bit counter for the virtual IMU
+    signal imu_bit : integer range 0 to 15 := 0;
 
     -- Address received from FPGA
     signal address_received : std_logic_vector(7 downto 0)
         := (others => '0');
 
-    signal imu_bit : integer range 0 to 7 := 0;
+    -- Stores the 16 bits transmitted by the FPGA
+    signal tx_received : std_logic_vector(15 downto 0)
+        := (others => '0');
 
 
 begin
@@ -69,14 +87,19 @@ begin
             clk              => clk,
 
             start            => start,
+
             register_address => register_address,
 
             register_data    => register_data,
+
             done             => done,
 
             sclk             => sclk,
+
             mosi             => mosi,
+
             miso             => miso,
+
             cs               => cs
         );
 
@@ -89,7 +112,7 @@ begin
     begin
 
         ------------------------------------------------------------
-        -- Request register 0x75
+        -- Request WHO_AM_I register
         ------------------------------------------------------------
 
         register_address <= x"75";
@@ -109,30 +132,30 @@ begin
 
 
         ------------------------------------------------------------
-        -- Wait for transaction completion
+        -- Wait for SPI transaction to complete
         ------------------------------------------------------------
 
         wait until done = '1';
 
 
         ------------------------------------------------------------
-        -- Check received register data
+        -- Check received WHO_AM_I value
         ------------------------------------------------------------
 
-        assert register_data = IMU_REGISTER_DATA
+        assert register_data = WHO_AM_I_DATA
 
-            report "ERROR: Register data is incorrect!"
+            report "ERROR: WHO_AM_I value is incorrect!"
 
             severity error;
 
 
         ------------------------------------------------------------
-        -- Check transmitted register address
+        -- Check transmitted SPI address byte
         ------------------------------------------------------------
 
-        assert address_received = x"75"
+        assert address_received = x"F5"
 
-            report "ERROR: Register address is incorrect!"
+            report "ERROR: SPI read address is incorrect!"
 
             severity error;
 
@@ -141,7 +164,7 @@ begin
         -- Successful test
         ------------------------------------------------------------
 
-        report "SUCCESS: IMU Controller register read completed correctly."
+        report "SUCCESS: ICM-42688-P WHO_AM_I read completed correctly."
 
             severity note;
 
@@ -154,16 +177,19 @@ begin
 
 
     ----------------------------------------------------------------
-    -- Virtual IMU
+    -- Virtual ICM-42688-P
     --
     -- SPI Mode 0
+    --
+    -- Data changes on falling edge.
+    -- FPGA samples data on rising edge.
     ----------------------------------------------------------------
 
     process(cs, sclk)
     begin
 
         ------------------------------------------------------------
-        -- CS LOW
+        -- CS goes LOW
         -- Start of SPI transaction
         ------------------------------------------------------------
 
@@ -171,40 +197,44 @@ begin
 
             imu_bit <= 0;
 
-            -- Send MSB of register data
-            miso <= IMU_REGISTER_DATA(7);
+            -- Send first bit of the 16-bit response
+            miso <= IMU_RESPONSE(15);
 
 
         ------------------------------------------------------------
         -- Rising edge of SCLK
-        -- FPGA samples MISO
-        -- Virtual IMU samples MOSI
+        --
+        -- FPGA samples MISO.
+        -- Virtual IMU samples MOSI.
         ------------------------------------------------------------
 
         elsif rising_edge(sclk) then
 
             if cs = '0' then
 
-                address_received <=
-                    address_received(6 downto 0) & mosi;
+                -- Store transmitted MOSI bit
+                tx_received <=
+                    tx_received(14 downto 0) & mosi;
 
             end if;
 
 
         ------------------------------------------------------------
         -- Falling edge of SCLK
-        -- Prepare next MISO bit
+        --
+        -- Prepare next MISO bit.
         ------------------------------------------------------------
 
         elsif falling_edge(sclk) then
 
             if cs = '0' then
 
-                if imu_bit < 7 then
+                if imu_bit < 15 then
 
                     imu_bit <= imu_bit + 1;
 
-                    miso <= IMU_REGISTER_DATA(6 - imu_bit);
+                    miso <=
+                        IMU_RESPONSE(14 - imu_bit);
 
                 end if;
 
@@ -213,5 +243,19 @@ begin
         end if;
 
     end process;
+
+
+    ----------------------------------------------------------------
+    -- Extract the first transmitted byte
+    --
+    -- After the complete 16-bit transfer:
+    --
+    -- tx_received = F5 00
+    --
+    -- The first byte is the SPI read address.
+    ----------------------------------------------------------------
+
+    address_received <= tx_received(15 downto 8);
+
 
 end architecture sim;
