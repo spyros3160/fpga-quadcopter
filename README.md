@@ -94,7 +94,9 @@ The final flight controller is planned to contain the following hardware modules
 ### Phase 3 — IMU Interface
 
 - [x] SPI master
-- [ ] IMU communication
+- [x] ICM-42688-P SPI register read
+- [x] WHO_AM_I register verification
+- [ ] IMU hardware communication
 - [ ] Accelerometer data processing
 - [ ] Gyroscope data processing
 
@@ -176,7 +178,31 @@ The existing `pwm` module is instantiated four times to generate four independen
 - PWM Channel 3
 - PWM Channel 4
 
-The four channels are intended to provide independent control signals for the four ESCs of the quadcopter..
+The four channels are intended to provide independent control signals for the four ESCs of the quadcopter.## IMU Controller
+
+An IMU controller was implemented in VHDL to interface with the ICM-42688-P through the SPI Master.
+
+The controller generates SPI register-read transactions according to the ICM-42688-P SPI protocol.
+
+### WHO_AM_I Verification
+
+The ICM-42688-P `WHO_AM_I` register was used as the first register-level verification test.
+
+- Register address: `0x75`
+- Expected value: `0x47`
+- SPI read command: `0xF5`
+- Dummy byte: `0x00`
+
+The transaction was successfully verified in ModelSim using a virtual ICM-42688-P device.
+
+Verified:
+
+- Register address transmission
+- SPI read command generation
+- 16-bit SPI transaction
+- Register data reception
+- `WHO_AM_I = 0x47`
+- Transfer completion
 
 ## PWM Verification
 
@@ -222,39 +248,56 @@ The current hardware test uses the following DSD-i1 FPGA pins:
 I/O standard:
 
 - 3.3-V LVCMOS
-I/O standard:
-
-
 
 ## SPI Master
 
-Implemented an 8-bit SPI Master in VHDL.
+Implemented a reusable 16-bit SPI Master in VHDL for communication with the ICM-42688-P IMU.
 
 ### Features
 
 - SPI Mode 0
 - 1 MHz SPI clock
 - MSB-first transmission
-- 8-bit transmit and receive
+- 16-bit SPI transactions
 - Start/done control
 - CS, SCLK, MOSI and MISO signals
+- Generic FPGA clock and SPI clock frequency
 
 ## IMU Controller
 
-An IMU controller was implemented in VHDL to interface with the SPI Master.
+An IMU controller was implemented in VHDL to interface with the ICM-42688-P through the SPI Master.
 
-The controller manages SPI transactions and provides received data to the higher-level flight-control logic.
+The controller generates SPI register-read transactions according to the ICM-42688-P SPI protocol.
 
-The IMU Controller was verified in ModelSim using a virtual SPI device.
+### WHO_AM_I Verification
+
+The ICM-42688-P `WHO_AM_I` register was used as the first register-level verification test.
+
+- Register address: `0x75`
+- Expected value: `0x47`
+- SPI read command: `0xF5`
+- Dummy byte: `0x00`
+
+The transaction was successfully verified in ModelSim using a virtual ICM-42688-P device.
+
+Verified:
+
+- Register address transmission
+- SPI read command generation
+- 16-bit SPI transaction
+- Register data reception
+- `WHO_AM_I = 0x47`
+- Transfer completion
 
 ### Verification
 
-The SPI Master was simulated in ModelSim using a virtual SPI slave.
+The SPI Master was simulated in ModelSim using a virtual ICM-42688-P SPI device.
 
 Verified:
+
 - MOSI transmission
 - MISO reception
-- 8-bit transfers
+- 16-bit SPI transfers
 - CS control
 - SPI clock generation
 - Transfer completion
