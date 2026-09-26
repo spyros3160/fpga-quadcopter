@@ -7,28 +7,57 @@ end entity spi_master_tb;
 
 architecture sim of spi_master_tb is
 
+    ----------------------------------------------------------------
     -- FPGA clock
+    ----------------------------------------------------------------
+
     signal clk : std_logic := '0';
 
+
+    ----------------------------------------------------------------
     -- SPI Master internal interface
-    signal start   : std_logic := '0';
-    signal tx_data : std_logic_vector(7 downto 0) := (others => '0');
+    ----------------------------------------------------------------
 
-    signal rx_data : std_logic_vector(7 downto 0);
-    signal done    : std_logic;
+    signal start : std_logic := '0';
 
+    signal tx_data : std_logic_vector(15 downto 0)
+        := (others => '0');
+
+    signal rx_data : std_logic_vector(15 downto 0);
+
+    signal done : std_logic;
+
+
+    ----------------------------------------------------------------
     -- SPI physical signals
-    signal sclk : std_logic;
-    signal mosi : std_logic;
-    signal miso : std_logic := '0';
-    signal cs   : std_logic;
+    ----------------------------------------------------------------
 
-    -- Virtual IMU data
-    signal imu_data : std_logic_vector(7 downto 0) := "00110101";
-    signal imu_bit  : integer range 0 to 7 := 0;
+    signal sclk : std_logic;
+
+    signal mosi : std_logic;
+
+    signal miso : std_logic := '0';
+
+    signal cs : std_logic;
+
+
+    ----------------------------------------------------------------
+    -- Virtual SPI slave
+    ----------------------------------------------------------------
+
+    -- Expected data returned by the virtual IMU
+    constant SLAVE_RESPONSE : std_logic_vector(15 downto 0)
+        := x"0047";
+
+    -- Store the data transmitted by the FPGA
+    signal tx_received : std_logic_vector(15 downto 0)
+        := (others => '0');
+
+    -- Bit counter
+    signal slave_bit : integer range 0 to 15 := 0;
+
 
 begin
-
 
     ----------------------------------------------------------------
     -- 50 MHz FPGA clock
@@ -71,23 +100,67 @@ begin
     process
     begin
 
-        -- Data that FPGA will transmit
-        tx_data <= "11001010";
+        ------------------------------------------------------------
+        -- Data transmitted by FPGA
+        --
+        -- F5 = READ + register address 0x75
+        -- 00 = dummy byte
+        ------------------------------------------------------------
 
-        -- Wait before starting
+        tx_data <= x"F500";
+
         wait for 100 ns;
 
-        -- Start SPI transfer
+
+        ------------------------------------------------------------
+        -- Start SPI transaction
+        ------------------------------------------------------------
+
         start <= '1';
 
         wait for 20 ns;
 
         start <= '0';
 
-        -- Wait until SPI transfer is completed
+
+        ------------------------------------------------------------
+        -- Wait for transaction completion
+        ------------------------------------------------------------
+
         wait until done = '1';
 
-        -- Give ModelSim some time to display final signals
+
+        ------------------------------------------------------------
+        -- Check received data
+        ------------------------------------------------------------
+
+        assert rx_data = x"0047"
+
+            report "ERROR: Received SPI data is incorrect!"
+
+            severity error;
+
+
+        ------------------------------------------------------------
+        -- Check transmitted data
+        ------------------------------------------------------------
+
+        assert tx_received = x"F500"
+
+            report "ERROR: Transmitted SPI data is incorrect!"
+
+            severity error;
+
+
+        ------------------------------------------------------------
+        -- Successful test
+        ------------------------------------------------------------
+
+        report "SUCCESS: 16-bit SPI transfer completed correctly."
+
+            severity note;
+
+
         wait for 100 ns;
 
         wait;
@@ -96,34 +169,63 @@ begin
 
 
     ----------------------------------------------------------------
-    -- Virtual IMU
+    -- Virtual SPI Slave
+    --
     -- SPI Mode 0
+    --
+    -- Data changes on falling edge.
+    -- FPGA samples data on rising edge.
     ----------------------------------------------------------------
 
     process(cs, sclk)
     begin
 
-        -- CS goes LOW:
+        ------------------------------------------------------------
+        -- CS goes LOW
         -- Start of SPI transaction
+        ------------------------------------------------------------
+
         if falling_edge(cs) then
 
-            imu_bit <= 0;
+            slave_bit <= 0;
 
-            -- First bit (MSB)
-            miso <= imu_data(7);
+            -- First bit of response
+            miso <= SLAVE_RESPONSE(15);
 
 
-        -- SCLK falling edge:
-        -- Prepare next MISO bit
+        ------------------------------------------------------------
+        -- Rising edge of SCLK
+        --
+        -- FPGA samples MISO.
+        -- Virtual slave samples MOSI.
+        ------------------------------------------------------------
+
+        elsif rising_edge(sclk) then
+
+            if cs = '0' then
+
+                tx_received <=
+                    tx_received(14 downto 0) & mosi;
+
+            end if;
+
+
+        ------------------------------------------------------------
+        -- Falling edge of SCLK
+        --
+        -- Prepare next MISO bit.
+        ------------------------------------------------------------
+
         elsif falling_edge(sclk) then
 
             if cs = '0' then
 
-                if imu_bit < 7 then
+                if slave_bit < 15 then
 
-                    imu_bit <= imu_bit + 1;
+                    slave_bit <= slave_bit + 1;
 
-                    miso <= imu_data(6 - imu_bit);
+                    miso <=
+                        SLAVE_RESPONSE(14 - slave_bit);
 
                 end if;
 
@@ -132,6 +234,5 @@ begin
         end if;
 
     end process;
-
 
 end architecture sim;
