@@ -43,7 +43,7 @@ Board-specific pin assignments and constraints will be kept separate from the re
 
 The final flight controller is planned to contain the following hardware modules:
 
-
+---
                     FPGA
                      │
          ┌───────────┼───────────┐
