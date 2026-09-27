@@ -18,7 +18,12 @@ architecture sim of imu_controller_tb is
     -- IMU Controller interface
     ----------------------------------------------------------------
 
-    signal start            : std_logic := '0';
+    signal start : std_logic := '0';
+
+    signal write_enable : std_logic := '0';
+
+    signal write_data : std_logic_vector(7 downto 0)
+        := (others => '0');
 
     signal register_address : std_logic_vector(7 downto 0)
         := (others => '0');
@@ -45,25 +50,17 @@ architecture sim of imu_controller_tb is
     -- Virtual ICM-42688-P
     ----------------------------------------------------------------
 
-    -- WHO_AM_I register value
     constant WHO_AM_I_DATA : std_logic_vector(7 downto 0)
         := x"47";
 
-    -- The complete 16-bit response from the IMU
-    --
-    -- First byte  = dummy
-    -- Second byte = WHO_AM_I = 0x47
     constant IMU_RESPONSE : std_logic_vector(15 downto 0)
         := x"0047";
 
-    -- Bit counter for the virtual IMU
     signal imu_bit : integer range 0 to 15 := 0;
 
-    -- Address received from FPGA
     signal address_received : std_logic_vector(7 downto 0)
         := (others => '0');
 
-    -- Stores the 16 bits transmitted by the FPGA
     signal tx_received : std_logic_vector(15 downto 0)
         := (others => '0');
 
@@ -88,7 +85,11 @@ begin
 
             start            => start,
 
+            write_enable     => write_enable,
+
             register_address => register_address,
+
+            write_data       => write_data,
 
             register_data    => register_data,
 
@@ -112,16 +113,21 @@ begin
     begin
 
         ------------------------------------------------------------
-        -- Request WHO_AM_I register
+        -- TEST 1
+        -- READ WHO_AM_I
         ------------------------------------------------------------
 
         register_address <= x"75";
+
+        write_enable <= '0';
+
+        write_data <= x"00";
 
         wait for 100 ns;
 
 
         ------------------------------------------------------------
-        -- Start register read
+        -- Start READ transaction
         ------------------------------------------------------------
 
         start <= '1';
@@ -132,14 +138,14 @@ begin
 
 
         ------------------------------------------------------------
-        -- Wait for SPI transaction to complete
+        -- Wait for transaction to complete
         ------------------------------------------------------------
 
         wait until done = '1';
 
 
         ------------------------------------------------------------
-        -- Check received WHO_AM_I value
+        -- Check WHO_AM_I
         ------------------------------------------------------------
 
         assert register_data = WHO_AM_I_DATA
@@ -150,7 +156,7 @@ begin
 
 
         ------------------------------------------------------------
-        -- Check transmitted SPI address byte
+        -- Check READ address
         ------------------------------------------------------------
 
         assert address_received = x"F5"
@@ -161,10 +167,76 @@ begin
 
 
         ------------------------------------------------------------
-        -- Successful test
+        -- READ successful
         ------------------------------------------------------------
 
-        report "SUCCESS: ICM-42688-P WHO_AM_I read completed correctly."
+        report "SUCCESS: WHO_AM_I READ completed correctly."
+
+            severity note;
+
+
+        ------------------------------------------------------------
+        -- Wait before WRITE test
+        ------------------------------------------------------------
+
+        wait for 100 ns;
+
+
+        ------------------------------------------------------------
+        -- TEST 2
+        -- WRITE PWR_MGMT0
+        ------------------------------------------------------------
+
+        register_address <= x"4E";
+
+        write_enable <= '1';
+
+        write_data <= x"0F";
+
+
+        ------------------------------------------------------------
+        -- Start WRITE transaction
+        ------------------------------------------------------------
+
+        start <= '1';
+
+        wait for 20 ns;
+
+        start <= '0';
+
+
+        ------------------------------------------------------------
+        -- Wait for transaction to complete
+        ------------------------------------------------------------
+
+        wait until done = '1';
+
+
+        ------------------------------------------------------------
+        -- Check WRITE transaction
+        ------------------------------------------------------------
+
+        assert tx_received = x"4E0F"
+
+            report "ERROR: SPI write transaction is incorrect!"
+
+            severity error;
+
+
+        ------------------------------------------------------------
+        -- WRITE successful
+        ------------------------------------------------------------
+
+        report "SUCCESS: PWR_MGMT0 WRITE completed correctly."
+
+            severity note;
+
+
+        ------------------------------------------------------------
+        -- All tests completed
+        ------------------------------------------------------------
+
+        report "SUCCESS: All IMU controller tests completed."
 
             severity note;
 
@@ -180,16 +252,12 @@ begin
     -- Virtual ICM-42688-P
     --
     -- SPI Mode 0
-    --
-    -- Data changes on falling edge.
-    -- FPGA samples data on rising edge.
     ----------------------------------------------------------------
 
     process(cs, sclk)
     begin
 
         ------------------------------------------------------------
-        -- CS goes LOW
         -- Start of SPI transaction
         ------------------------------------------------------------
 
@@ -197,22 +265,17 @@ begin
 
             imu_bit <= 0;
 
-            -- Send first bit of the 16-bit response
             miso <= IMU_RESPONSE(15);
 
 
         ------------------------------------------------------------
         -- Rising edge of SCLK
-        --
-        -- FPGA samples MISO.
-        -- Virtual IMU samples MOSI.
         ------------------------------------------------------------
 
         elsif rising_edge(sclk) then
 
             if cs = '0' then
 
-                -- Store transmitted MOSI bit
                 tx_received <=
                     tx_received(14 downto 0) & mosi;
 
@@ -221,8 +284,6 @@ begin
 
         ------------------------------------------------------------
         -- Falling edge of SCLK
-        --
-        -- Prepare next MISO bit.
         ------------------------------------------------------------
 
         elsif falling_edge(sclk) then
@@ -246,13 +307,7 @@ begin
 
 
     ----------------------------------------------------------------
-    -- Extract the first transmitted byte
-    --
-    -- After the complete 16-bit transfer:
-    --
-    -- tx_received = F5 00
-    --
-    -- The first byte is the SPI read address.
+    -- Extract first transmitted byte
     ----------------------------------------------------------------
 
     address_received <= tx_received(15 downto 8);
