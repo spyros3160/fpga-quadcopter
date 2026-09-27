@@ -16,7 +16,6 @@ The first hardware test uses the 50 MHz onboard clock of the DSD-i1 development 
 
 ### Current Development Board
 
-
 **DSD-i1 Digital System Design Development Board**
 
 - FPGA: Altera Cyclone IV E EP4CE6E22C8
@@ -44,34 +43,42 @@ Board-specific pin assignments and constraints will be kept separate from the re
 
 The final flight controller is planned to contain the following hardware modules:
 
-```text
-                     FPGA
-                      │
-          ┌───────────┼───────────┐
-          │           │           │
-         SPI         PWM         UART
-          │           │           │
-         IMU        ESC × 4    Telemetry
-          │           │
-          ▼           ▼
-   Sensor Processing  │
-          │           │
-          ▼           │
-  Attitude Estimation │
-          │           │
-          ▼           │
-      PID Control     │
-     Roll/Pitch/Yaw   │
-          │           │
-          ▼           │
-      Motor Mixer     │
-          │           │
-          ▼           ▼
-             PWM × 4
-                │
-             ESC × 4
-                │
-            Motors × 4## Development Roadmap
+
+                    FPGA
+                     │
+         ┌───────────┼───────────┐
+         │           │           │
+        SPI         PWM         UART
+         │           │           │
+        IMU        ESC × 4    Telemetry
+         │           │
+         ▼           ▼
+  Sensor Processing  │
+         │           │
+         ▼           │
+ Attitude Estimation │
+         │           │
+         ▼           │
+     PID Control     │
+    Roll/Pitch/Yaw   │
+         │           │
+         ▼           │
+     Motor Mixer     │
+         │           │
+         ▼           ▼
+            PWM × 4
+               │
+            ESC × 4
+               │
+           Motors × 4
+
+
+---
+
+## Development Roadmap
+
+```markdown
+## Development Roadmap
 
 ### Phase 1 — FPGA Fundamentals
 
@@ -95,9 +102,15 @@ The final flight controller is planned to contain the following hardware modules
 ### Phase 3 — IMU Interface
 
 - [x] SPI master
-- [x] ICM-42688-P SPI register read
+- [x] 16-bit SPI transactions
+- [x] ICM-42688-P register read
+- [x] ICM-42688-P register write
 - [x] WHO_AM_I register verification
+- [x] PWR_MGMT0 register write verification
 - [ ] IMU hardware communication
+- [ ] IMU initialization sequence
+- [ ] Accelerometer data acquisition
+- [ ] Gyroscope data acquisition
 - [ ] Accelerometer data processing
 - [ ] Gyroscope data processing
 
@@ -117,6 +130,7 @@ The final flight controller is planned to contain the following hardware modules
 - [ ] Full flight-controller integration
 - [ ] Ground testing
 - [ ] Flight testing
+
 
 ## Repository Structure
 
@@ -138,12 +152,18 @@ fpga-quadcopter/
 │   ├── pwm_4ch_tb.vhd
 │   ├── spi_master_tb.vhd
 │   └── imu_controller_tb.vhd
-|
+│
 ├── constraints/
 ├── docs/
 ├── hardware/
 └── images/
 
+
+---
+
+## Current FPGA Design
+
+```markdown
 ## Current FPGA Design
 
 The current VHDL design implements a simple clock divider/counter.
@@ -179,32 +199,58 @@ The existing `pwm` module is instantiated four times to generate four independen
 - PWM Channel 3
 - PWM Channel 4
 
-The four channels are intended to provide independent control signals for the four ESCs of the quadcopter.## IMU Controller
+The four channels are intended to provide independent control signals for the four ESCs of the quadcopter.
+
+## IMU Controller
 
 An IMU controller was implemented in VHDL to interface with the ICM-42688-P through the SPI Master.
 
-The controller generates SPI register-read transactions according to the ICM-42688-P SPI protocol.
+The controller provides a register-level interface supporting both register READ and WRITE operations.
 
-### WHO_AM_I Verification
+### Supported Operations
 
-The ICM-42688-P `WHO_AM_I` register was used as the first register-level verification test.
+- Register READ
+- Register WRITE
+- SPI Mode 0
+- 16-bit SPI transactions
+- MSB-first transmission
+
+### Register Interface Verification
+
+The controller was verified in ModelSim using a virtual ICM-42688-P device.
+
+#### WHO_AM_I READ
 
 - Register address: `0x75`
 - Expected value: `0x47`
-- SPI read command: `0xF5`
-- Dummy byte: `0x00`
+- SPI transaction: `0xF5 0x00`
 
-The transaction was successfully verified in ModelSim using a virtual ICM-42688-P device.
+The received value was verified as:
 
-Verified:
+WHO_AM_I = 0x47
 
-- Register address transmission
-- SPI read command generation
-- 16-bit SPI transaction
-- Register data reception
-- `WHO_AM_I = 0x47`
-- Transfer completion
+#### PWR_MGMT0 WRITE
 
+- Register address: `0x4E`
+- Test value: `0x0F`
+- SPI transaction: `0x4E 0x0F`
+
+Both register transactions completed successfully in ModelSim.
+
+### Verification Status
+
+- [x] Register READ
+- [x] Register WRITE
+- [x] WHO_AM_I verification
+- [x] PWR_MGMT0 WRITE verification
+- [ ] Physical IMU communication
+
+
+---
+
+## ΚΟΜΜΑΤΙ 8 — PWM Verification
+
+```markdown
 ## PWM Verification
 
 The PWM generator was first verified using ModelSim.
@@ -240,7 +286,7 @@ The current hardware test uses the following DSD-i1 FPGA pins:
 
 | Signal | FPGA Pin | Function |
 |--------|----------|----------|
-| `clk`  | `PIN_23` | 50 MHz onboard clock |
+| `clk` | `PIN_23` | 50 MHz onboard clock |
 | `pwm_out_1` | `PIN_110` | PWM Channel 1 |
 | `pwm_out_2` | `PIN_111` | PWM Channel 2 |
 | `pwm_out_3` | `PIN_112` | PWM Channel 3 |
@@ -264,35 +310,9 @@ Implemented a reusable 16-bit SPI Master in VHDL for communication with the ICM-
 - CS, SCLK, MOSI and MISO signals
 - Generic FPGA clock and SPI clock frequency
 
-## IMU Controller
-
-An IMU controller was implemented in VHDL to interface with the ICM-42688-P through the SPI Master.
-
-The controller generates SPI register-read transactions according to the ICM-42688-P SPI protocol.
-
-### WHO_AM_I Verification
-
-The ICM-42688-P `WHO_AM_I` register was used as the first register-level verification test.
-
-- Register address: `0x75`
-- Expected value: `0x47`
-- SPI read command: `0xF5`
-- Dummy byte: `0x00`
-
-The transaction was successfully verified in ModelSim using a virtual ICM-42688-P device.
-
-Verified:
-
-- Register address transmission
-- SPI read command generation
-- 16-bit SPI transaction
-- Register data reception
-- `WHO_AM_I = 0x47`
-- Transfer completion
-
 ### Verification
 
-The SPI Master was simulated in ModelSim using a virtual ICM-42688-P SPI device.
+The SPI Master was simulated in ModelSim using a virtual SPI slave.
 
 Verified:
 
