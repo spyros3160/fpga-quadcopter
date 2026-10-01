@@ -110,10 +110,10 @@ The final flight controller is planned to contain the following hardware modules
 - [x] IMU initialization
 - [x] IMU initialization simulation
 - [ ] IMU hardware communication
-- [ ] Accelerometer data acquisition
-- [ ] Gyroscope data acquisition
-- [ ] Accelerometer data processing
-- [ ] Gyroscope data processing
+- [x] Accelerometer data acquisition
+- [x] Gyroscope data acquisition
+- [x] Accelerometer data processing
+- [x] Gyroscope data processing
 
 ### Phase 4 — Flight Control
 
@@ -148,6 +148,7 @@ fpga-quadcopter/
 │   ├── spi_master.vhd
 │   └── imu_controller.vhd
 |   └── imu_init.vhd
+|   └── imu_sensor_reader.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -155,6 +156,7 @@ fpga-quadcopter/
 │   ├── spi_master_tb.vhd
 │   └── imu_controller_tb.vhd
 │   └── imu_init_tb.vhd
+|   └── imu_sensor_reader.tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -221,6 +223,54 @@ The initialization sequence performs the following operations:
 3. Write `0x0F` to the `PWR_MGMT0` register at address `0x4E`
 4. Wait 200 µs after enabling the sensor
 5. Assert the `initialization_done` signal
+
+## 6-Axis IMU Sensor Reader
+
+A VHDL sensor reader was implemented for the ICM-42688-P to acquire raw 16-bit accelerometer and gyroscope data through the IMU controller.
+
+The sensor reader acquires:
+
+### Accelerometer
+
+- Accelerometer X
+- Accelerometer Y
+- Accelerometer Z
+
+### Gyroscope
+
+- Gyroscope X
+- Gyroscope Y
+- Gyroscope Z
+
+Each sensor axis is represented as a signed 16-bit value composed of a high byte and a low byte.
+
+### Simulation
+
+The complete 6-axis sensor acquisition was verified in ModelSim using a virtual ICM-42688-P SPI device.
+
+The simulation verified:
+
+- Accelerometer X acquisition
+- Accelerometer Y acquisition
+- Accelerometer Z acquisition
+- Gyroscope X acquisition
+- Gyroscope Y acquisition
+- Gyroscope Z acquisition
+- SPI register addressing
+- 16-bit sensor data reconstruction
+- `data_valid` generation
+
+### Verification Status
+
+- [x] Accelerometer X acquisition
+- [x] Accelerometer Y acquisition
+- [x] Accelerometer Z acquisition
+- [x] Gyroscope X acquisition
+- [x] Gyroscope Y acquisition
+- [x] Gyroscope Z acquisition
+- [x] 6-axis ModelSim verification
+- [ ] Physical IMU communication
+- [ ] Sensor data processing
 
 ### Simulation
 
