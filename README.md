@@ -107,8 +107,9 @@ The final flight controller is planned to contain the following hardware modules
 - [x] ICM-42688-P register write
 - [x] WHO_AM_I register verification
 - [x] PWR_MGMT0 register write verification
+- [x] IMU initialization
+- [x] IMU initialization simulation
 - [ ] IMU hardware communication
-- [ ] IMU initialization sequence
 - [ ] Accelerometer data acquisition
 - [ ] Gyroscope data acquisition
 - [ ] Accelerometer data processing
@@ -146,13 +147,15 @@ fpga-quadcopter/
 │   ├── pwm_4ch.vhd
 │   ├── spi_master.vhd
 │   └── imu_controller.vhd
+|   └── imu_init.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
 │   ├── pwm_4ch_tb.vhd
 │   ├── spi_master_tb.vhd
 │   └── imu_controller_tb.vhd
-│
+│   └── imu_init_tb.vhd
+|
 ├── constraints/
 ├── docs/
 ├── hardware/
@@ -206,6 +209,43 @@ The four channels are intended to provide independent control signals for the fo
 An IMU controller was implemented in VHDL to interface with the ICM-42688-P through the SPI Master.
 
 The controller provides a register-level interface supporting both register READ and WRITE operations.
+
+## IMU Initialization
+
+An IMU initialization controller was implemented in VHDL for the ICM-42688-P.
+
+The initialization sequence performs the following operations:
+
+1. Read the `WHO_AM_I` register at address `0x75`
+2. Verify that the returned value is `0x47`
+3. Write `0x0F` to the `PWR_MGMT0` register at address `0x4E`
+4. Wait 200 µs after enabling the sensor
+5. Assert the `initialization_done` signal
+
+### Simulation
+
+The IMU initialization sequence was verified in ModelSim using a virtual ICM-42688-P SPI device.
+
+The simulation verified:
+
+- `WHO_AM_I` read
+- `WHO_AM_I = 0x47` verification
+- `PWR_MGMT0` write
+- `PWR_MGMT0 = 0x0F`
+- SPI communication
+- Initialization completion
+- 200 µs initialization delay
+
+The complete initialization sequence completed successfully in simulation.
+
+### Verification Status
+
+- [x] WHO_AM_I verification
+- [x] PWR_MGMT0 configuration
+- [x] 200 µs initialization delay
+- [x] Initialization state machine
+- [x] ModelSim verification
+- [ ] Physical IMU communication
 
 ### Supported Operations
 
