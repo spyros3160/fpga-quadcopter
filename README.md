@@ -1,4 +1,4 @@
-# FPGA Quadcopter
+# FPGA Quadcopter 
 
 An FPGA-based quadcopter flight controller developed in VHDL using an Altera Cyclone IV FPGA.
 
