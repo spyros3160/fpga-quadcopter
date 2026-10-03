@@ -117,11 +117,15 @@ The final flight controller is planned to contain the following hardware modules
 - [x] Accelerometer data processing
 - [x] Gyroscope data processing
 - [x] Sensor processor ModelSim verification
+- [x] Accelerometer tilt estimation
+- [x] Attitude estimation and complementary filter verification
 - [ ] IMU hardware communication
 
 ### Phase 4 — Flight Control
 
-- [ ] Attitude estimation
+- [x] Accelerometer tilt estimation
+- [x] Complementary filter attitude estimation
+- [ ] Attitude estimation hardware integration
 - [ ] Roll PID controller
 - [ ] Pitch PID controller
 - [ ] Yaw PID controller
@@ -155,6 +159,8 @@ fpga-quadcopter/
 |   └── imu_sensor_reader.vhd
 |   └── imu_hardware_test.vhd
 |   └── sensor_processor.vhd
+|   └── accel_tilt_estimator.vhd
+|   └── attitude_estimator.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -164,6 +170,8 @@ fpga-quadcopter/
 │   └── imu_init_tb.vhd
 |   └── imu_sensor_reader.tb.vhd
 |   └── sensor_processor_tb.vhd
+|   └── accel_tilt_estimator_tb.vhd
+|   └── attitude_estimator_tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -350,6 +358,64 @@ The simulation verified:
 - [x] 6-axis ModelSim verification
 - [ ] Physical IMU communication
 - [x] Sensor data processing
+
+## Attitude Estimation
+
+Two dedicated VHDL modules have been verified as the basis of the attitude-estimation chain.
+
+### Accelerometer Tilt Estimator
+
+The `accel_tilt_estimator` module calculates accelerometer-based roll and pitch angles from the processed accelerometer X/Y/Z values.
+
+The implementation uses fixed-point arithmetic and FPGA-friendly approximations for `atan2` and vector magnitude.
+
+Verified cases include:
+
+- Level position: 0° roll / 0° pitch
+- +45° roll
+- -45° roll
+- +45° pitch
+- -45° pitch
+- +90° pitch
+- -90° pitch
+- `angle_valid` timing
+
+### Complementary Filter
+
+The `attitude_estimator` module combines accelerometer tilt estimates with gyroscope angular-rate measurements.
+
+The filter uses:
+
+- Q16.8 sensor and output values
+- Q16.16 internal attitude state
+- 1 kHz sensor update rate
+- 1 ms integration interval
+- 98% gyroscope contribution
+- 2% accelerometer contribution
+
+The higher-precision internal Q16.16 representation preserves fractional information during gyroscope integration before conversion back to Q16.8 outputs.
+
+ModelSim verification covers:
+
+- Initial zero attitude
+- Gyroscope integration
+- Complementary filter response
+- Roll response toward accelerometer estimate
+- Pitch response
+- Negative roll convergence
+- Convergence through zero toward a negative target
+
+Both the accelerometer tilt estimator and complementary-filter estimator passed Quartus compilation and ModelSim verification.
+
+### Verification Status
+
+- [x] Accelerometer tilt estimation
+- [x] Accelerometer tilt ModelSim verification
+- [x] Gyroscope integration
+- [x] Complementary filter
+- [x] Attitude estimator ModelSim verification
+- [ ] Integrated IMU processing chain
+- [ ] Physical IMU attitude estimation
 
 ## Sensor Processor
 
