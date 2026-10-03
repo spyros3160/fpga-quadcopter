@@ -109,11 +109,14 @@ The final flight controller is planned to contain the following hardware modules
 - [x] PWR_MGMT0 register write verification
 - [x] IMU initialization
 - [x] IMU initialization simulation
-- [ ] IMU hardware communication
+- [x] Accelerometer configuration
+- [x] Gyroscope configuration
+- [x] Gyro startup delay
 - [x] Accelerometer data acquisition
 - [x] Gyroscope data acquisition
-- [x] Accelerometer data processing
-- [x] Gyroscope data processing
+- [ ] Accelerometer data processing
+- [ ] Gyroscope data processing
+- [ ] IMU hardware communication
 
 ### Phase 4 — Flight Control
 
@@ -222,7 +225,53 @@ The initialization sequence performs the following operations:
 2. Verify that the returned value is `0x47`
 3. Write `0x0F` to the `PWR_MGMT0` register at address `0x4E`
 4. Wait 200 µs after enabling the sensor
-5. Assert the `initialization_done` signal
+5. Configure the accelerometer with `ACCEL_CONFIG0 = 0x26`
+6. Configure the gyroscope with `GYRO_CONFIG0 = 0x06`
+7. Wait for the gyroscope startup period
+8. Assert the `initialization_done` signal
+
+### Sensor Configuration
+
+| Sensor | Configuration |
+|---|---|
+| Accelerometer | ±8 g |
+| Accelerometer ODR | 1 kHz |
+| Gyroscope | ±2000 dps |
+| Gyroscope ODR | 1 kHz |
+
+### Register Configuration
+
+| Register | Address | Value | Function |
+|---|---:|---:|---|
+| WHO_AM_I | `0x75` | `0x47` | Device identification |
+| PWR_MGMT0 | `0x4E` | `0x0F` | Enable accelerometer and gyroscope |
+| ACCEL_CONFIG0 | `0x50` | `0x26` | ±8 g, 1 kHz |
+| GYRO_CONFIG0 | `0x4F` | `0x06` | ±2000 dps, 1 kHz |
+
+### ModelSim Verification
+
+The complete initialization sequence was verified using a virtual ICM-42688-P SPI device.
+
+Verified SPI transactions:
+
+```text
+WHO_AM_I      → F5 00
+PWR_MGMT0     → 4E 0F
+ACCEL_CONFIG0 → 50 26
+GYRO_CONFIG0  → 4F 06
+```
+
+The simulation also verifies the required gyroscope startup delay before initialization is completed.
+
+### Verification Status
+
+- [x] WHO_AM_I verification
+- [x] PWR_MGMT0 configuration
+- [x] Accelerometer configuration
+- [x] Gyroscope configuration
+- [x] Gyroscope startup delay
+- [x] Complete initialization simulation
+- [ ] Physical IMU communication
 
 ## 6-Axis IMU Sensor Reader
 
@@ -274,17 +323,26 @@ The simulation verified:
 
 ### Simulation
 
-The IMU initialization sequence was verified in ModelSim using a virtual ICM-42688-P SPI device.
+The complete ICM-42688-P initialization sequence was verified in ModelSim using a virtual SPI device.
 
 The simulation verified:
 
-- `WHO_AM_I` read
-- `WHO_AM_I = 0x47` verification
-- `PWR_MGMT0` write
-- `PWR_MGMT0 = 0x0F`
-- SPI communication
+- `WHO_AM_I` read and `0x47` verification
+- `PWR_MGMT0 = 0x0F` write
+- 200 µs delay after sensor enable
+- `ACCEL_CONFIG0 = 0x26` write
+- `GYRO_CONFIG0 = 0x06` write
+- Gyroscope startup delay
 - Initialization completion
-- 200 µs initialization delay
+
+Verified SPI transactions:
+
+```text
+F5 00
+4E 0F
+50 26
+4F 06
+```
 
 The complete initialization sequence completed successfully in simulation.
 
@@ -293,6 +351,9 @@ The complete initialization sequence completed successfully in simulation.
 - [x] WHO_AM_I verification
 - [x] PWR_MGMT0 configuration
 - [x] 200 µs initialization delay
+- [x] Accelerometer configuration
+- [x] Gyroscope configuration
+- [x] Gyroscope startup delay
 - [x] Initialization state machine
 - [x] ModelSim verification
 - [ ] Physical IMU communication
