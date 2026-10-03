@@ -59,6 +59,11 @@ architecture rtl of imu_init is
         WRITE_PWR_MGMT0,
         WAIT_PWR_MGMT0,
         WAIT_200US,
+        WRITE_ACCEL_CONFIG,
+        WAIT_ACCEL_CONFIG,
+        WRITE_GYRO_CONFIG,
+        WAIT_GYRO_CONFIG,
+        WAIT_GYRO_STARTUP,
         COMPLETE,
         ERROR
     );
@@ -67,14 +72,16 @@ architecture rtl of imu_init is
 
 
     ----------------------------------------------------------------
-    -- 200 us delay
+    -- Delay counter
     --
     -- 50 MHz clock
     -- 1 clock = 20 ns
+    --
     -- 200 us = 10,000 clock cycles
+    -- 30 ms  = 1,500,000 clock cycles
     ----------------------------------------------------------------
 
-    signal delay_counter : integer range 0 to 9999 := 0;
+    signal delay_counter : integer range 0 to 1499999 := 0;
 
 
 begin
@@ -123,7 +130,6 @@ begin
 
         if rising_edge(clk) then
 
-
             --------------------------------------------------------
             -- Default values
             --------------------------------------------------------
@@ -132,7 +138,6 @@ begin
 
 
             case state is
-
 
                 ----------------------------------------------------
                 -- IDLE
@@ -231,6 +236,94 @@ begin
                 when WAIT_200US =>
 
                     if delay_counter = 9999 then
+
+                        state <= WRITE_ACCEL_CONFIG;
+
+                    else
+
+                        delay_counter <= delay_counter + 1;
+
+                    end if;
+
+
+                ----------------------------------------------------
+                -- WRITE ACCEL_CONFIG0
+                --
+                -- 0x50 = ACCEL_CONFIG0
+                -- 0x26 = ±8 g, 1 kHz
+                ----------------------------------------------------
+
+                when WRITE_ACCEL_CONFIG =>
+
+                    register_address <= x"50";
+
+                    write_enable <= '1';
+
+                    write_data <= x"26";
+
+                    controller_start <= '1';
+
+                    state <= WAIT_ACCEL_CONFIG;
+
+
+                ----------------------------------------------------
+                -- WAIT FOR ACCEL_CONFIG0 WRITE
+                ----------------------------------------------------
+
+                when WAIT_ACCEL_CONFIG =>
+
+                    if controller_done = '1' then
+
+                        state <= WRITE_GYRO_CONFIG;
+
+                    end if;
+
+
+                ----------------------------------------------------
+                -- WRITE GYRO_CONFIG0
+                --
+                -- 0x4F = GYRO_CONFIG0
+                -- 0x06 = ±2000 dps, 1 kHz
+                ----------------------------------------------------
+
+                when WRITE_GYRO_CONFIG =>
+
+                    register_address <= x"4F";
+
+                    write_enable <= '1';
+
+                    write_data <= x"06";
+
+                    controller_start <= '1';
+
+                    state <= WAIT_GYRO_CONFIG;
+
+
+                ----------------------------------------------------
+                -- WAIT FOR GYRO_CONFIG0 WRITE
+                ----------------------------------------------------
+
+                when WAIT_GYRO_CONFIG =>
+
+                    if controller_done = '1' then
+
+                        delay_counter <= 0;
+
+                        state <= WAIT_GYRO_STARTUP;
+
+                    end if;
+
+
+                ----------------------------------------------------
+                -- WAIT FOR GYROSCOPE STARTUP
+                --
+                -- 30 ms at 50 MHz
+                -- = 1,500,000 clock cycles
+                ----------------------------------------------------
+
+                when WAIT_GYRO_STARTUP =>
+
+                    if delay_counter = 1499999 then
 
                         state <= COMPLETE;
 
