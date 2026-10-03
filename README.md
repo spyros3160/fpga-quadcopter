@@ -114,8 +114,9 @@ The final flight controller is planned to contain the following hardware modules
 - [x] Gyro startup delay
 - [x] Accelerometer data acquisition
 - [x] Gyroscope data acquisition
-- [ ] Accelerometer data processing
-- [ ] Gyroscope data processing
+- [x] Accelerometer data processing
+- [x] Gyroscope data processing
+- [x] Sensor processor ModelSim verification
 - [ ] IMU hardware communication
 
 ### Phase 4 — Flight Control
@@ -153,6 +154,7 @@ fpga-quadcopter/
 |   └── imu_init.vhd
 |   └── imu_sensor_reader.vhd
 |   └── imu_hardware_test.vhd
+|   └── sensor_processor.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -161,6 +163,7 @@ fpga-quadcopter/
 │   └── imu_controller_tb.vhd
 │   └── imu_init_tb.vhd
 |   └── imu_sensor_reader.tb.vhd
+|   └── sensor_processor_tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -346,7 +349,52 @@ The simulation verified:
 - [x] Gyroscope Z acquisition
 - [x] 6-axis ModelSim verification
 - [ ] Physical IMU communication
-- [ ] Sensor data processing
+- [x] Sensor data processing
+
+## Sensor Processor
+
+A dedicated VHDL sensor-processing module converts the raw 16-bit ICM-42688-P accelerometer and gyroscope measurements into fixed-point physical values.
+
+The processor uses a Q16.8 fixed-point representation:
+
+- 24-bit signed output
+- 8 fractional bits
+- 1.0 = 256
+
+### Conversion
+
+| Sensor | Configuration | Conversion |
+|---|---|---|
+| Accelerometer | ±8 g, 4096 LSB/g | raw / 16 |
+| Gyroscope | ±2000 dps, 16.4 LSB/(dps) | raw × 640 / 41 |
+
+The processor generates the three processed accelerometer axes, the three processed gyroscope axes, and a `processed_valid` signal.
+
+### ModelSim Verification
+
+The sensor processor was verified with a dedicated testbench.
+
+Verified conversions:
+
+```text
+1 g       → Q16.8 = 256
+-2 g      → Q16.8 = -512
+10 dps    → Q16.8 = 2560
+-50 dps   → Q16.8 = -12800
+```
+
+The Quartus compilation and ModelSim simulation completed successfully.
+
+### Verification Status
+
+- [x] Accelerometer conversion
+- [x] Gyroscope conversion
+- [x] Positive values
+- [x] Negative values
+- [x] processed_valid
+- [x] ModelSim verification
+- [ ] Physical IMU data processing
+
 
 ### Simulation
 
