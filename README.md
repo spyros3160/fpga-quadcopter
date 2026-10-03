@@ -152,6 +152,7 @@ fpga-quadcopter/
 │   └── imu_controller.vhd
 |   └── imu_init.vhd
 |   └── imu_sensor_reader.vhd
+|   └── imu_hardware_test.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -272,6 +273,32 @@ The simulation also verifies the required gyroscope startup delay before initial
 - [x] Gyroscope startup delay
 - [x] Complete initialization simulation
 - [ ] Physical IMU communication
+
+## IMU Hardware Test
+
+A dedicated hardware test top-level entity was added for physical ICM-42688-P validation.
+
+The `imu_hardware_test` module connects the IMU initialization controller to external SPI signals:
+
+- `SCLK`
+- `MOSI`
+- `MISO`
+- `CS`
+
+The `imu_ok` signal is connected to an FPGA LED. The LED is asserted when the ICM-42688-P `WHO_AM_I` register is successfully verified.
+
+The module is intended as a hardware-validation wrapper and is kept separate from the reusable IMU RTL modules.
+
+The current hardware test top-level does not yet include final board-specific SPI pin assignments. These will be added when the physical IMU and target development board are available.
+
+### Hardware Test Status
+
+- [x] Hardware test top-level
+- [x] SPI signals exposed
+- [x] `imu_ok` LED indication
+- [ ] Physical ICM-42688-P connected
+- [ ] Hardware SPI communication
+- [ ] Hardware WHO_AM_I verification
 
 ## 6-Axis IMU Sensor Reader
 
