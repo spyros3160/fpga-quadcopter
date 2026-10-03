@@ -44,21 +44,35 @@ architecture sim of imu_init_tb is
     -- Virtual ICM-42688-P
     ----------------------------------------------------------------
 
-    constant WHO_AM_I_DATA : std_logic_vector(7 downto 0)
-        := x"47";
-
     constant IMU_RESPONSE : std_logic_vector(15 downto 0)
         := x"0047";
 
 
     ----------------------------------------------------------------
-    -- SPI receive data from FPGA
+    -- SPI data transmitted by FPGA
     ----------------------------------------------------------------
 
     signal tx_received : std_logic_vector(15 downto 0)
         := (others => '0');
 
+
+    ----------------------------------------------------------------
+    -- SPI bit counter
+    ----------------------------------------------------------------
+
     signal imu_bit : integer range 0 to 15 := 0;
+
+
+    ----------------------------------------------------------------
+    -- SPI transaction counter
+    --
+    -- 0 = WHO_AM_I
+    -- 1 = PWR_MGMT0
+    -- 2 = ACCEL_CONFIG0
+    -- 3 = GYRO_CONFIG0
+    ----------------------------------------------------------------
+
+    signal transaction_count : integer range 0 to 4 := 0;
 
 
 begin
@@ -107,7 +121,6 @@ begin
     process
     begin
 
-
         ------------------------------------------------------------
         -- Wait for simulation to stabilize
         ------------------------------------------------------------
@@ -120,7 +133,6 @@ begin
         ------------------------------------------------------------
 
         report "Starting IMU initialization..."
-
             severity note;
 
         start <= '1';
@@ -138,7 +150,7 @@ begin
 
 
         ------------------------------------------------------------
-        -- Check WHO_AM_I
+        -- Check WHO_AM_I verification
         ------------------------------------------------------------
 
         assert imu_ok = '1'
@@ -163,9 +175,11 @@ begin
 
         wait for 100 ns;
 
+
         report "SUCCESS: All IMU initialization tests completed."
 
             severity note;
+
 
         wait;
 
@@ -173,20 +187,17 @@ begin
 
 
     ----------------------------------------------------------------
-    -- Virtual ICM-42688-P
+    -- Virtual ICM-42688-P SPI slave
     --
     -- SPI Mode 0
     --
-    -- The virtual IMU returns:
+    -- WHO_AM_I response:
     --
-    -- WHO_AM_I = 0x47
-    --
-    -- during the READ transaction.
+    -- 0x47
     ----------------------------------------------------------------
 
     process(cs, sclk)
     begin
-
 
         ------------------------------------------------------------
         -- Start of SPI transaction
@@ -195,6 +206,8 @@ begin
         if falling_edge(cs) then
 
             imu_bit <= 0;
+
+            tx_received <= (others => '0');
 
             miso <= IMU_RESPONSE(15);
 
@@ -234,6 +247,134 @@ begin
                         IMU_RESPONSE(14 - imu_bit);
 
                 end if;
+
+            end if;
+
+        end if;
+
+    end process;
+
+
+    ----------------------------------------------------------------
+    -- SPI transaction verification
+    --
+    -- Separate process for rising edge of CS.
+    ----------------------------------------------------------------
+
+    process(cs)
+    begin
+
+        if rising_edge(cs) then
+
+            case transaction_count is
+
+                ----------------------------------------------------
+                -- Transaction 1
+                -- READ WHO_AM_I
+                -- Expected: F5 00
+                ----------------------------------------------------
+
+                when 0 =>
+
+                    assert tx_received = x"F500"
+
+                        report
+                        "ERROR: WHO_AM_I SPI transaction incorrect!"
+
+                        severity error;
+
+
+                    report
+                    "SUCCESS: WHO_AM_I transaction = 0xF500"
+
+                        severity note;
+
+
+                ----------------------------------------------------
+                -- Transaction 2
+                -- WRITE PWR_MGMT0
+                -- Expected: 4E 0F
+                ----------------------------------------------------
+
+                when 1 =>
+
+                    assert tx_received = x"4E0F"
+
+                        report
+                        "ERROR: PWR_MGMT0 SPI transaction incorrect!"
+
+                        severity error;
+
+
+                    report
+                    "SUCCESS: PWR_MGMT0 transaction = 0x4E0F"
+
+                        severity note;
+
+
+                ----------------------------------------------------
+                -- Transaction 3
+                -- WRITE ACCEL_CONFIG0
+                -- Expected: 50 26
+                ----------------------------------------------------
+
+                when 2 =>
+
+                    assert tx_received = x"5026"
+
+                        report
+                        "ERROR: ACCEL_CONFIG0 SPI transaction incorrect!"
+
+                        severity error;
+
+
+                    report
+                    "SUCCESS: ACCEL_CONFIG0 transaction = 0x5026"
+
+                        severity note;
+
+
+                ----------------------------------------------------
+                -- Transaction 4
+                -- WRITE GYRO_CONFIG0
+                -- Expected: 4F 06
+                ----------------------------------------------------
+
+                when 3 =>
+
+                    assert tx_received = x"4F06"
+
+                        report
+                        "ERROR: GYRO_CONFIG0 SPI transaction incorrect!"
+
+                        severity error;
+
+
+                    report
+                    "SUCCESS: GYRO_CONFIG0 transaction = 0x4F06"
+
+                        severity note;
+
+
+                ----------------------------------------------------
+                -- Any additional transaction
+                ----------------------------------------------------
+
+                when others =>
+
+                    null;
+
+            end case;
+
+
+            --------------------------------------------------------
+            -- Move to next transaction
+            --------------------------------------------------------
+
+            if transaction_count < 4 then
+
+                transaction_count <=
+                    transaction_count + 1;
 
             end if;
 
