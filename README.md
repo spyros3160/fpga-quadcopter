@@ -643,3 +643,8 @@ Flight-control development will be verified through simulation and controlled ha
 **Spyros Plakoutsis**
 
 GitHub: [@spyros3160](https://github.com/spyros3160)
+
+
+## Verification Update
+
+The integrated IMU processing chain has been verified in ModelSim with a 200-sample +45 degree roll test. Final roll: 44.125 degrees. Final pitch: 0 degrees.
