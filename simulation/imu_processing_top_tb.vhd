@@ -24,11 +24,8 @@ architecture sim of imu_processing_top_tb is
     signal response_byte : std_logic_vector(7 downto 0)
         := (others => '0');
 
-    signal command_byte : std_logic_vector(7 downto 0)
-        := (others => '0');
-
     signal bit_count : integer range 0 to 16 := 0;
-    signal transaction_active : std_logic := '0';
+    signal transaction_number : integer range 0 to 11 := 0;
 
 begin
 
@@ -48,50 +45,80 @@ begin
         );
 
     process(sclk, cs)
-        variable cmd_value : std_logic_vector(7 downto 0);
+        variable response_value : std_logic_vector(7 downto 0);
     begin
         if cs = '1' then
             bit_count <= 0;
-            command_byte <= (others => '0');
-            response_byte <= (others => '0');
             miso <= '0';
-            transaction_active <= '0';
 
-        elsif falling_edge(sclk) then
-            transaction_active <= '1';
+        elsif rising_edge(sclk) then
 
             if bit_count < 8 then
-                command_byte <=
-                    command_byte(6 downto 0) & mosi;
-
                 bit_count <= bit_count + 1;
+            end if;
 
-                if bit_count = 7 then
-                    cmd_value :=
-                        command_byte(6 downto 0) & mosi;
+        elsif falling_edge(sclk) then
 
-                    case cmd_value is
-                        when x"9F" => response_byte <= x"00";
-                        when x"A0" => response_byte <= x"00";
-                        when x"A1" => response_byte <= x"00";
-                        when x"A2" => response_byte <= x"00";
-                        when x"A3" => response_byte <= x"10";
-                        when x"A4" => response_byte <= x"00";
-                        when x"A5" => response_byte <= x"00";
-                        when x"A6" => response_byte <= x"00";
-                        when x"A7" => response_byte <= x"00";
-                        when x"A8" => response_byte <= x"00";
-                        when x"A9" => response_byte <= x"00";
-                        when x"AA" => response_byte <= x"00";
-                        when others => response_byte <= x"00";
-                    end case;
+            if bit_count = 8 then
 
-                    bit_count <= 8;
-                end if;
+                case transaction_number is
+                    when 0  => response_value := x"00"; -- Accel X high
+                    when 1  => response_value := x"00"; -- Accel X low
+                    when 2  => response_value := x"0B"; -- Accel Y high
+                    when 3  => response_value := x"50"; -- Accel Y low
+                    when 4  => response_value := x"0B"; -- Accel Z high
+                    when 5  => response_value := x"50"; -- Accel Z low
+                    when 6  => response_value := x"00"; -- Gyro X high
+                    when 7  => response_value := x"00"; -- Gyro X low
+                    when 8  => response_value := x"00"; -- Gyro Y high
+                    when 9  => response_value := x"00"; -- Gyro Y low
+                    when 10 => response_value := x"00"; -- Gyro Z high
+                    when 11 => response_value := x"00"; -- Gyro Z low
+                    when others => response_value := x"00";
+                end case;
 
-            elsif bit_count < 16 then
-                miso <= response_byte(15 - bit_count);
-                bit_count <= bit_count + 1;
+                response_byte <= response_value;
+                miso <= response_value(7);
+                bit_count <= 9;
+
+            elsif bit_count = 9 then
+                miso <= response_byte(6);
+                bit_count <= 10;
+
+            elsif bit_count = 10 then
+                miso <= response_byte(5);
+                bit_count <= 11;
+
+            elsif bit_count = 11 then
+                miso <= response_byte(4);
+                bit_count <= 12;
+
+            elsif bit_count = 12 then
+                miso <= response_byte(3);
+                bit_count <= 13;
+
+            elsif bit_count = 13 then
+                miso <= response_byte(2);
+                bit_count <= 14;
+
+            elsif bit_count = 14 then
+                miso <= response_byte(1);
+                bit_count <= 15;
+
+            elsif bit_count = 15 then
+                miso <= response_byte(0);
+                bit_count <= 16;
+            end if;
+        end if;
+    end process;
+
+    process(cs)
+    begin
+        if rising_edge(cs) then
+            if transaction_number = 11 then
+                transaction_number <= 0;
+            else
+                transaction_number <= transaction_number + 1;
             end if;
         end if;
     end process;
@@ -100,27 +127,46 @@ begin
     begin
         wait for 100 ns;
 
-        start <= '1';
-        wait for CLK_PERIOD;
-        start <= '0';
+        for sample in 1 to 200 loop
 
-        wait until attitude_valid = '1';
+            start <= '1';
+            wait for CLK_PERIOD;
+            start <= '0';
 
-        report "SUCCESS: attitude_valid detected."
+            wait until attitude_valid = '1';
+            wait until attitude_valid = '0';
+
+        end loop;
+
+        report "SUCCESS: 200 IMU samples processed."
             severity note;
 
-        assert abs(to_integer(roll_deg)) <= 2
-            report "ERROR: Roll is not approximately 0 degrees."
+        report "Final Roll = "
+            & integer'image(to_integer(roll_deg))
+            & " degrees (Q16.8)"
+            severity note;
+
+        report "Final Pitch = "
+            & integer'image(to_integer(pitch_deg))
+            & " degrees (Q16.8)"
+            severity note;
+
+        assert to_integer(roll_deg) >= 42 * 256
+            report "ERROR: Roll did not converge close to +45 degrees."
             severity error;
 
-        assert abs(to_integer(pitch_deg)) <= 2
+        assert to_integer(roll_deg) <= 46 * 256
+            report "ERROR: Roll exceeded expected +45 degree range."
+            severity error;
+
+        assert abs(to_integer(pitch_deg)) <= 2 * 256
             report "ERROR: Pitch is not approximately 0 degrees."
             severity error;
 
-        report "SUCCESS: Complete IMU processing chain verified."
+        report "SUCCESS: +45 degree roll integration test passed."
             severity note;
 
-        report "SUCCESS: Roll and Pitch are approximately 0 degrees."
+        report "SUCCESS: Complete IMU attitude chain verified."
             severity note;
 
         wait;
