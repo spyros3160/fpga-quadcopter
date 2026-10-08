@@ -8,7 +8,7 @@ This project aims to implement the core flight-control logic of a quadcopter dir
 
 🚧 **In development**
 
-The project currently includes verified FPGA fundamentals, PWM generation, SPI communication, ICM-42688-P IMU initialization and 6-axis sensor processing.
+The project currently includes verified FPGA fundamentals, PWM generation, SPI communication, ICM-42688-P IMU initialization, 6-axis sensor processing, integrated attitude estimation and a verified PID controller module.
 
 The first hardware test uses the 50 MHz onboard clock of the DSD-i1 development board to drive an LED through a VHDL-based counter.
 
@@ -127,6 +127,7 @@ The final flight controller is planned to contain the following hardware modules
 - [x] Accelerometer tilt estimation
 - [x] Complementary filter attitude estimation
 - [ ] Attitude estimation hardware integration
+- [x] PID controller module ModelSim verification
 - [ ] Roll PID controller
 - [ ] Pitch PID controller
 - [ ] Yaw PID controller
@@ -162,6 +163,7 @@ fpga-quadcopter/
 |   └── sensor_processor.vhd
 |   └── accel_tilt_estimator.vhd
 |   └── attitude_estimator.vhd
+|   └── pid_controller.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -173,6 +175,7 @@ fpga-quadcopter/
 |   └── sensor_processor_tb.vhd
 |   └── accel_tilt_estimator_tb.vhd
 |   └── attitude_estimator_tb.vhd
+|   └── pid_controller_tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -697,3 +700,74 @@ The current integrated IMU verification uses:
 - `rtl/sensor_processor.vhd` - fixed-point sensor conversion
 - `rtl/accel_tilt_estimator.vhd` - accelerometer roll/pitch estimation
 - `rtl/attitude_estimator.vhd` - complementary-filter attitude estimation
+
+
+## PID Controller
+
+A reusable PID controller was implemented in VHDL as the next flight-control building block after the verified IMU attitude-estimation chain.
+
+The controller uses the existing Q16.8 fixed-point representation:
+
+- 24-bit signed setpoint
+- 24-bit signed measurement
+- 24-bit signed control output
+- 8 fractional bits
+- 1.0 = 256
+
+The controller implements:
+
+- Proportional term
+- Integral term
+- Derivative term
+- Error calculation: `setpoint - measurement`
+- Reset of the internal integral and previous-error state
+- 24-bit signed output limiting
+- `data_valid` / `output_valid` handshake
+
+### Initial Simulation Parameters
+
+The first verification uses:
+
+| Parameter | Value |
+|---|---:|
+| Kp | 256 |
+| Ki | 10 |
+| Kd | 50 |
+
+These are initial simulation values and are not final flight-tuning parameters.
+
+### ModelSim Verification
+
+The dedicated `pid_controller_tb.vhd` testbench verifies independent PID responses after resetting the controller before each test.
+
+Verified cases:
+
+```text
+Zero error at 0°       → output = 0
++10° error             → output = 3160
+-10° error             → output = -3160
++2° error              → output = 632
+Zero error at +10°     → output = 0
+```
+
+The testbench completed successfully with:
+
+```text
+SUCCESS: All PID controller tests passed.
+```
+
+The PID RTL also passed Quartus compilation before ModelSim verification.
+
+### Verification Status
+
+- [x] PID controller RTL
+- [x] Quartus compilation
+- [x] Positive error response
+- [x] Negative error response
+- [x] Small-error response
+- [x] Integral/derivative state reset between verification cases
+- [x] ModelSim verification
+- [ ] Roll PID integration
+- [ ] Pitch PID integration
+- [ ] Yaw PID integration
+- [ ] Motor mixer integration
