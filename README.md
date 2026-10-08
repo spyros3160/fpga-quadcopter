@@ -128,6 +128,7 @@ The final flight controller is planned to contain the following hardware modules
 - [x] Complementary filter attitude estimation
 - [ ] Attitude estimation hardware integration
 - [x] PID controller module ModelSim verification
+- [x] Motor mixer ModelSim verification
 - [ ] Roll PID controller
 - [ ] Pitch PID controller
 - [ ] Yaw PID controller
@@ -164,6 +165,7 @@ fpga-quadcopter/
 |   └── accel_tilt_estimator.vhd
 |   └── attitude_estimator.vhd
 |   └── pid_controller.vhd
+|   └── motor_mixer.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -176,6 +178,7 @@ fpga-quadcopter/
 |   └── accel_tilt_estimator_tb.vhd
 |   └── attitude_estimator_tb.vhd
 |   └── pid_controller_tb.vhd
+|   └── motor_mixer_tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -771,3 +774,101 @@ The PID RTL also passed Quartus compilation before ModelSim verification.
 - [ ] Pitch PID integration
 - [ ] Yaw PID integration
 - [ ] Motor mixer integration
+
+
+## Motor Mixer
+
+A reusable VHDL motor mixer was implemented for the X-configuration quadcopter.
+
+The mixer combines:
+
+- Base throttle
+- Roll correction
+- Pitch correction
+- Yaw correction
+
+and generates four motor commands in microseconds for the existing 1000–2000 μs PWM range.
+
+The current X-configuration convention is:
+
+```text
+              FRONT
+
+          M1          M2
+       Front-Left  Front-Right
+
+          M4          M3
+       Rear-Left   Rear-Right
+
+               REAR
+```
+
+The implemented mixing equations are:
+
+```text
+M1 = Throttle + Pitch + Roll - Yaw
+M2 = Throttle + Pitch - Roll + Yaw
+M3 = Throttle - Pitch - Roll - Yaw
+M4 = Throttle - Pitch + Roll + Yaw
+```
+
+Roll, pitch and yaw corrections use the existing Q16.8 representation, where 256 represents one unit. The mixer converts these corrections to microsecond adjustments before applying the motor equations.
+
+### Saturation
+
+Each motor output is limited to:
+
+```text
+1000 μs ≤ Motor output ≤ 2000 μs
+```
+
+This prevents the mixer from generating values outside the range supported by the current PWM generator.
+
+### ModelSim Verification
+
+The dedicated `motor_mixer_tb.vhd` verifies:
+
+- Throttle-only operation
+- Positive roll correction
+- Positive pitch correction
+- Positive yaw correction
+- Motor output saturation
+
+Verified results:
+
+```text
+Throttle only:
+M1 = 1500  M2 = 1500  M3 = 1500  M4 = 1500
+
+Positive Roll:
+M1 = 1501  M2 = 1499  M3 = 1499  M4 = 1501
+
+Positive Pitch:
+M1 = 1501  M2 = 1501  M3 = 1499  M4 = 1499
+
+Positive Yaw:
+M1 = 1499  M2 = 1501  M3 = 1499  M4 = 1501
+
+Saturation:
+M1 = 2000  M2 = 1000  M3 = 1000  M4 = 2000
+```
+
+The ModelSim testbench completed successfully with:
+
+```text
+SUCCESS: All Motor Mixer tests passed.
+```
+
+### Verification Status
+
+- [x] Motor mixer RTL
+- [x] Quartus compilation
+- [x] Throttle mixing
+- [x] Roll mixing
+- [x] Pitch mixing
+- [x] Yaw mixing
+- [x] Output saturation
+- [x] ModelSim verification
+- [ ] PID-to-mixer integration
+- [ ] Mixer-to-PWM integration
+- [ ] ESC interface
