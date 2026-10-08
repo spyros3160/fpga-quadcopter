@@ -8,7 +8,7 @@ This project aims to implement the core flight-control logic of a quadcopter dir
 
 🚧 **In development**
 
-The project currently starts with the implementation and verification of basic FPGA functionality.
+The project currently includes verified FPGA fundamentals, PWM generation, SPI communication, ICM-42688-P IMU initialization and 6-axis sensor processing.
 
 The first hardware test uses the 50 MHz onboard clock of the DSD-i1 development board to drive an LED through a VHDL-based counter.
 
@@ -119,6 +119,7 @@ The final flight controller is planned to contain the following hardware modules
 - [x] Sensor processor ModelSim verification
 - [x] Accelerometer tilt estimation
 - [x] Attitude estimation and complementary filter verification
+- [x] Integrated IMU processing chain ModelSim verification
 - [ ] IMU hardware communication
 
 ### Phase 4 — Flight Control
@@ -414,7 +415,7 @@ Both the accelerometer tilt estimator and complementary-filter estimator passed 
 - [x] Gyroscope integration
 - [x] Complementary filter
 - [x] Attitude estimator ModelSim verification
-- [ ] Integrated IMU processing chain
+- [x] Integrated IMU processing chain ModelSim verification
 - [ ] Physical IMU attitude estimation
 
 ## Sensor Processor
