@@ -685,3 +685,15 @@ The expected roll range is 42 to 46 degrees, so the measured 44.125 degrees is w
 - [x] +45 degree roll verification
 - [ ] Physical ICM-42688-P communication
 - [ ] Physical IMU attitude estimation
+
+
+## Current IMU Integration Files
+
+The current integrated IMU verification uses:
+
+- `rtl/imu_processing_top.vhd` - top-level integration of the IMU processing chain
+- `simulation/imu_processing_top_tb.vhd` - ModelSim integration testbench
+- `rtl/imu_sensor_reader.vhd` - 6-axis raw sensor acquisition
+- `rtl/sensor_processor.vhd` - fixed-point sensor conversion
+- `rtl/accel_tilt_estimator.vhd` - accelerometer roll/pitch estimation
+- `rtl/attitude_estimator.vhd` - complementary-filter attitude estimation
