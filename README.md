@@ -646,6 +646,42 @@ Flight-control development will be verified through simulation and controlled ha
 GitHub: [@spyros3160](https://github.com/spyros3160)
 
 
-## Verification Update
+## Integrated IMU Processing Chain
 
-The integrated IMU processing chain has been verified in ModelSim with a 200-sample +45 degree roll test. Final roll: 44.125 degrees. Final pitch: 0 degrees.
+The `imu_processing_top` module integrates the IMU processing path from SPI sensor acquisition through sensor conversion, accelerometer tilt estimation and complementary-filter attitude estimation.
+
+### ModelSim Integration Test
+
+The virtual ICM-42688-P test uses a static orientation of approximately +45 degrees roll:
+
+- Accelerometer X = 0 g
+- Accelerometer Y = approximately +0.707 g
+- Accelerometer Z = approximately +0.707 g
+- Gyroscope X/Y/Z = 0 dps
+
+The test performs 200 complete IMU acquisitions and waits for `attitude_valid` after each acquisition.
+
+### Result
+
+The complete integration test passed:
+
+```text
+200 IMU samples processed
+Final Roll  = 11296 Q16.8 = 44.125 degrees
+Final Pitch = 0 Q16.8 = 0 degrees
++45 degree roll integration test passed
+Complete IMU attitude chain verified
+```
+
+The expected roll range is 42 to 46 degrees, so the measured 44.125 degrees is within the verification limits.
+
+### Verification Status
+
+- [x] SPI to sensor-reader integration
+- [x] Raw accelerometer and gyroscope processing
+- [x] Accelerometer tilt estimation
+- [x] Complementary-filter attitude estimation
+- [x] 200-sample integrated ModelSim verification
+- [x] +45 degree roll verification
+- [ ] Physical ICM-42688-P communication
+- [ ] Physical IMU attitude estimation
