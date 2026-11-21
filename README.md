@@ -8,7 +8,7 @@ This project aims to implement the core flight-control logic of a quadcopter dir
 
 🚧 **In development**
 
-The project currently includes verified FPGA fundamentals, PWM generation, SPI communication, ICM-42688-P IMU initialization, 6-axis sensor processing, integrated attitude estimation and a verified PID controller module.
+The project currently includes verified FPGA fundamentals, PWM generation, SPI communication, ICM-42688-P IMU initialization, 6-axis sensor processing, integrated attitude estimation, PID controllers, a motor mixer, and verified PID-to-motor-mixer integration.
 
 The first hardware test uses the 50 MHz onboard clock of the DSD-i1 development board to drive an LED through a VHDL-based counter.
 
@@ -129,10 +129,10 @@ The final flight controller is planned to contain the following hardware modules
 - [ ] Attitude estimation hardware integration
 - [x] PID controller module ModelSim verification
 - [x] Motor mixer ModelSim verification
-- [ ] Roll PID controller
-- [ ] Pitch PID controller
-- [ ] Yaw PID controller
-- [ ] Quadrotor motor mixer
+- [x] Three-axis PID control integration
+- [x] PID-to-motor-mixer integration ModelSim verification
+- [ ] PID tuning and controller stabilization
+- [ ] Attitude control hardware integration
 
 ### Phase 5 — System Integration
 
@@ -166,6 +166,7 @@ fpga-quadcopter/
 |   └── attitude_estimator.vhd
 |   └── pid_controller.vhd
 |   └── motor_mixer.vhd
+|   └── pid_motor_control.vhd
 │
 ├── simulation/
 │   ├── pwm_tb.vhd
@@ -179,6 +180,7 @@ fpga-quadcopter/
 |   └── attitude_estimator_tb.vhd
 |   └── pid_controller_tb.vhd
 |   └── motor_mixer_tb.vhd
+|   └── pid_motor_control_tb.vhd
 |
 ├── constraints/
 ├── docs/
@@ -775,6 +777,71 @@ The PID RTL also passed Quartus compilation before ModelSim verification.
 - [ ] Yaw PID integration
 - [ ] Motor mixer integration
 
+
+## PID-to-Motor Mixer Integration
+
+The `pid_motor_control` module integrates three independent PID controllers for Roll, Pitch and Yaw with the quadrotor motor mixer.
+
+### Integrated Control Path
+
+```text
+Roll setpoint / measurement  -> PID Roll  --┐
+Pitch setpoint / measurement -> PID Pitch --┼-> Motor Mixer -> M1-M4
+Yaw setpoint / measurement   -> PID Yaw   --┘
+```
+
+The module receives three desired attitude values, three measured attitude values and a base throttle command. The three PID outputs are combined by the motor mixer to produce four motor commands in microseconds.
+
+### ModelSim Integration Verification
+
+The integration testbench verifies:
+
+- Zero-error operation
+- Roll PID response
+- Pitch PID response
+- Yaw PID response
+- Simultaneous operation of all three PID controllers
+
+Verified results:
+
+```text
+Zero error:
+M1 = 1500  M2 = 1500  M3 = 1500  M4 = 1500
+
+Roll:
+M1 = 1512  M2 = 1488  M3 = 1488  M4 = 1512
+
+Pitch:
+M1 = 1512  M2 = 1512  M3 = 1488  M4 = 1488
+
+Yaw:
+M1 = 1488  M2 = 1512  M3 = 1488  M4 = 1512
+
+All three PID controllers:
+M1 = 1512  M2 = 1512  M3 = 1464  M4 = 1512
+```
+
+The integration test completed successfully:
+
+```text
+SUCCESS: PID to Motor Mixer integration passed.
+```
+
+### Integration Verification Status
+
+- [x] Three PID controller instances
+- [x] Roll controller response
+- [x] Pitch controller response
+- [x] Yaw controller response
+- [x] PID output synchronization
+- [x] Motor mixer connection
+- [x] Zero-error test
+- [x] Individual axis tests
+- [x] Simultaneous three-axis test
+- [x] Quartus compilation
+- [x] ModelSim integration verification
+- [ ] PID-to-4-channel PWM integration
+- [ ] Hardware testing
 
 ## Motor Mixer
 
